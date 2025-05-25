@@ -1,13 +1,12 @@
 from flask import Flask, request, jsonify
 from sales_nav_agent import run_agent
+import os  # <-- Added for port binding
 
 app = Flask(__name__)
-
 
 @app.route('/')
 def index():
     return "SalesNav Agent API Running"
-
 
 @app.route('/process', methods=['POST'])
 def process():
@@ -22,3 +21,8 @@ def process():
         return jsonify({"status": "success"})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
+
+if __name__ == "__main__":
+    # Port fix for Render
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
