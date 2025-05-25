@@ -1,8 +1,21 @@
+import os
 from flask import Flask, request, jsonify
 from sales_nav_agent import run_agent
-import os  # <-- Added for port binding
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 app = Flask(__name__)
+
+REQUIRED_FIELDS = [
+    'company_name',
+    'website',
+    'phantom_key',
+    'phantom_id',
+    'sheet_id',
+    'creds_file'
+]
 
 @app.route('/')
 def index():
@@ -10,19 +23,36 @@ def index():
 
 @app.route('/process', methods=['POST'])
 def process():
+    if not request.is_json:
+        return jsonify({
+            "status": "error",
+            "message": "Request must be JSON"
+        }), 400
+
     data = request.json
+
+    # Validate required fields
+    missing_fields = [field for field in REQUIRED_FIELDS if not data.get(field)]
+    if missing_fields:
+        return jsonify({
+            "status": "error",
+            "message": f"Missing required fields: {', '.join(missing_fields)}"
+        }), 400
+
     try:
-        run_agent(company_name=data['company_name'],
-                  website=data['website'],
-                  phantom_key=data['phantom_key'],
-                  phantom_id=data['phantom_id'],
-                  sheet_id=data['sheet_id'],
-                  creds_file=data['creds_file'])
+        # Use environment variables as the fallback
+        run_agent(
+            company_name=data['company_name'],
+            website=data['website'],
+            phantom_key=data.get('phantom_key') or os.getenv('PHANTOMBUSTER_API_KEY'),
+            phantom_id=data.get('phantom_id') or os.getenv('PHANTOMBUSTER_AGENT_ID'),
+            sheet_id=data.get('sheet_id') or os.getenv('GOOGLE_SHEET_ID'),
+            creds_file=data.get('creds_file') or os.getenv('GOOGLE_CREDENTIALS_PATH')
+        )
         return jsonify({"status": "success"})
     except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
-
-if __name__ == "__main__":
-    # Port fix for Render
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port)
+        return jsonify({
+            "status": "error",
+            "message": str(e),
+            "type": type(e).__name__
+        }), 500
